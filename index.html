@@ -1,0 +1,387 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Video Downloader</title>
+<style>
+  :root{
+    --bg:#0b1020; --bg2:#151b36; --card:rgba(255,255,255,.07); --card-border:rgba(255,255,255,.12);
+    --text:#eef1ff; --muted:#a3abd0; --accent:#ff4d6d; --accent2:#7c5cff; --ok:#2dd4a0; --err:#ff6b6b;
+    --input:rgba(255,255,255,.09); --row:rgba(255,255,255,.05); --shadow:0 20px 60px rgba(0,0,0,.35);
+  }
+  @media (prefers-color-scheme: light){
+    :root{
+      --bg:#f4f6ff; --bg2:#e7ebff; --card:rgba(255,255,255,.85); --card-border:rgba(20,30,80,.10);
+      --text:#141a3a; --muted:#59618a; --input:#fff; --row:rgba(20,30,80,.04); --shadow:0 20px 60px rgba(40,50,120,.15);
+    }
+  }
+  *{box-sizing:border-box}
+  html{background:var(--bg)}
+  html,body{margin:0}
+  body{
+    min-height:100vh; font-family:system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif; color:var(--text);
+    display:flex; flex-direction:column; align-items:center; padding:0 16px; position:relative;
+  }
+  body::before{
+    content:""; position:fixed; inset:0; z-index:-1; pointer-events:none;
+    background:radial-gradient(1200px 600px at 15% -10%, rgba(124,92,255,.35), transparent 60%),
+               radial-gradient(900px 500px at 100% 0%, rgba(255,77,109,.28), transparent 55%),
+               linear-gradient(160deg,var(--bg),var(--bg2));
+  }
+  header{width:100%; max-width:760px; display:flex; align-items:center; justify-content:space-between; padding:22px 0 0}
+  .brand{display:flex; align-items:center; gap:10px; font-weight:800; letter-spacing:.2px}
+  .logo{width:36px; height:36px; border-radius:11px; display:grid; place-items:center;
+        background:linear-gradient(135deg,var(--accent),var(--accent2)); box-shadow:0 8px 24px rgba(255,77,109,.35)}
+  .logo svg{width:20px; height:20px; fill:#fff}
+  .icon-btn{background:var(--card); border:1px solid var(--card-border); color:var(--text); width:40px; height:40px;
+            border-radius:12px; cursor:pointer; display:grid; place-items:center}
+  .icon-btn:hover{border-color:var(--accent2)}
+  .icon-btn svg{width:20px; height:20px; fill:currentColor}
+  main{width:100%; max-width:760px; padding:34px 0 40px}
+  h1{font-size:clamp(28px,6vw,44px); line-height:1.1; margin:0 0 10px; text-align:center; font-weight:800}
+  h1 span{background:linear-gradient(90deg,var(--accent),var(--accent2)); -webkit-background-clip:text; background-clip:text; color:transparent}
+  .lead{text-align:center; color:var(--muted); margin:0 auto 26px; max-width:520px; line-height:1.5}
+
+  .box{background:var(--card); border:1px solid var(--card-border); border-radius:20px; padding:14px; box-shadow:var(--shadow); backdrop-filter:blur(12px)}
+  .search{display:flex; gap:10px; flex-wrap:wrap}
+  .field{flex:1 1 280px; position:relative; display:flex}
+  .field input{width:100%; height:54px; border-radius:14px; border:1px solid var(--card-border); background:var(--input); color:var(--text);
+               font-size:16px; padding:0 96px 0 16px; outline:none}
+  .field input:focus{border-color:var(--accent2); box-shadow:0 0 0 4px rgba(124,92,255,.2)}
+  .field input::placeholder{color:var(--muted)}
+  .paste{position:absolute; right:8px; top:8px; height:38px; padding:0 12px; border-radius:10px; border:0; cursor:pointer;
+         background:var(--row); color:var(--text); font-weight:600; font-size:14px}
+  .paste:hover{background:rgba(124,92,255,.25)}
+  .go{height:54px; padding:0 26px; border:0; border-radius:14px; cursor:pointer; color:#fff; font-weight:700; font-size:16px;
+      background:linear-gradient(135deg,var(--accent),var(--accent2)); box-shadow:0 10px 26px rgba(124,92,255,.35); flex:0 0 auto}
+  .go:hover{filter:brightness(1.08)} .go:disabled{opacity:.6; cursor:wait}
+  .hint{margin:10px 4px 2px; font-size:13px; color:var(--muted)}
+  .msg{margin:12px 4px 2px; padding:12px 14px; border-radius:12px; font-size:14px; display:none}
+  .msg.err{display:block; background:rgba(255,107,107,.14); color:var(--err); border:1px solid rgba(255,107,107,.35)}
+
+  .spinner{width:18px; height:18px; border-radius:50%; border:3px solid rgba(255,255,255,.35); border-top-color:#fff; display:inline-block;
+           vertical-align:-3px; margin-right:8px; animation:spin .8s linear infinite}
+  @keyframes spin{to{transform:rotate(360deg)}}
+
+  #result{display:none; margin-top:22px}
+  .video{display:flex; gap:16px; flex-wrap:wrap; padding:14px}
+  .thumb{flex:0 0 240px; max-width:100%; aspect-ratio:16/9; border-radius:14px; overflow:hidden; background:#000; position:relative}
+  .thumb img{width:100%; height:100%; object-fit:cover; display:block}
+  .dur{position:absolute; right:8px; bottom:8px; background:rgba(0,0,0,.8); color:#fff; font-size:12px; font-weight:700; padding:3px 7px; border-radius:6px}
+  .meta{flex:1 1 220px; min-width:0}
+  .meta h2{margin:2px 0 8px; font-size:18px; line-height:1.3; overflow-wrap:anywhere}
+  .meta p{margin:0 0 4px; color:var(--muted); font-size:14px}
+  .section-title{margin:18px 6px 10px; font-size:13px; font-weight:700; letter-spacing:.8px; text-transform:uppercase; color:var(--muted)}
+  .list{display:grid; gap:10px; padding:0 6px 6px}
+  .row{background:var(--row); border:1px solid var(--card-border); border-radius:14px; padding:12px 14px; display:grid;
+       grid-template-columns:1fr auto; gap:10px; align-items:center}
+  .row .left{display:flex; align-items:center; gap:10px; min-width:0}
+  .res{font-weight:800; font-size:18px}
+  .tag{font-size:11px; font-weight:800; padding:3px 8px; border-radius:999px; color:#fff; background:linear-gradient(135deg,var(--accent2),#4f8cff)}
+  .tag.audio{background:linear-gradient(135deg,#16c79a,#2dd4a0)}
+  .tag.k4{background:linear-gradient(135deg,var(--accent),#ff8a4d)}
+  .dl{height:42px; padding:0 18px; border:0; border-radius:12px; cursor:pointer; font-weight:700; font-size:15px; color:#fff;
+      background:linear-gradient(135deg,var(--accent),var(--accent2)); display:inline-flex; align-items:center; gap:8px; min-width:138px; justify-content:center}
+  .dl svg{width:18px; height:18px; fill:#fff}
+  .dl:hover{filter:brightness(1.08)} .dl:disabled{opacity:.7; cursor:wait}
+  .dl.done{background:linear-gradient(135deg,#16c79a,#2dd4a0)}
+  .progress{grid-column:1 / -1; display:none}
+  .bar{height:8px; border-radius:99px; background:rgba(255,255,255,.12); overflow:hidden}
+  .bar i{display:block; height:100%; width:0; background:linear-gradient(90deg,var(--accent),var(--accent2)); border-radius:99px; transition:width .15s}
+  .bar.indet i{width:40%; animation:slide 1.1s ease-in-out infinite}
+  @keyframes slide{0%{margin-left:-40%}100%{margin-left:100%}}
+  .status{font-size:12.5px; color:var(--muted); margin-top:6px}
+  .status.err{color:var(--err)}
+
+  .steps{display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:12px; margin-top:30px}
+  .step{background:var(--card); border:1px solid var(--card-border); border-radius:16px; padding:16px}
+  .step b{display:inline-grid; place-items:center; width:28px; height:28px; border-radius:50%; margin-bottom:8px; color:#fff;
+          background:linear-gradient(135deg,var(--accent),var(--accent2)); font-size:14px}
+  .step h3{margin:0 0 4px; font-size:16px} .step p{margin:0; color:var(--muted); font-size:14px; line-height:1.45}
+  footer{color:var(--muted); font-size:12.5px; text-align:center; padding:0 0 28px; max-width:640px; line-height:1.55}
+
+  dialog{border:1px solid var(--card-border); border-radius:18px; background:var(--bg2); color:var(--text); padding:20px; width:min(440px,92vw); box-shadow:var(--shadow)}
+  dialog::backdrop{background:rgba(0,0,0,.55)}
+  dialog h3{margin:0 0 6px} dialog p{margin:0 0 12px; color:var(--muted); font-size:14px; line-height:1.45}
+  dialog input{width:100%; height:46px; border-radius:12px; border:1px solid var(--card-border); background:var(--input); color:var(--text); padding:0 12px; font-size:15px}
+  .dlg-actions{display:flex; gap:10px; justify-content:flex-end; margin-top:14px}
+  .btn2{height:40px; padding:0 16px; border-radius:10px; border:1px solid var(--card-border); background:var(--row); color:var(--text); cursor:pointer; font-weight:600}
+  .btn2.primary{border:0; color:#fff; background:linear-gradient(135deg,var(--accent),var(--accent2))}
+  @media (max-width:520px){ .thumb{flex-basis:100%} .row{grid-template-columns:1fr} .dl{width:100%} }
+  @media (prefers-reduced-motion: reduce){ *{animation:none !important; transition:none !important} }
+</style>
+</head>
+<body>
+<header>
+  <div class="brand">
+    <div class="logo" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 3a1 1 0 0 1 1 1v9.59l3.3-3.3a1 1 0 1 1 1.4 1.42l-5 5a1 1 0 0 1-1.4 0l-5-5a1 1 0 1 1 1.4-1.42L11 13.59V4a1 1 0 0 1 1-1zM5 19a1 1 0 1 1 0-2h14a1 1 0 1 1 0 2H5z"/></svg></div>
+    <span>Video Downloader</span>
+  </div>
+  <button class="icon-btn" id="settingsBtn" title="Server settings" aria-label="Server settings">
+    <svg viewBox="0 0 24 24"><path d="M19.4 13a7.9 7.9 0 0 0 0-2l2-1.6a.5.5 0 0 0 .1-.6l-1.9-3.3a.5.5 0 0 0-.6-.2l-2.4 1a7.6 7.6 0 0 0-1.7-1l-.4-2.5a.5.5 0 0 0-.5-.4h-3.8a.5.5 0 0 0-.5.4l-.4 2.5a7.6 7.6 0 0 0-1.7 1l-2.4-1a.5.5 0 0 0-.6.2L2.6 8.8a.5.5 0 0 0 .1.6l2 1.6a7.9 7.9 0 0 0 0 2l-2 1.6a.5.5 0 0 0-.1.6l1.9 3.3c.1.2.4.3.6.2l2.4-1c.5.4 1.1.7 1.7 1l.4 2.5c0 .2.3.4.5.4h3.8c.2 0 .5-.2.5-.4l.4-2.5c.6-.3 1.2-.6 1.7-1l2.4 1c.2.1.5 0 .6-.2l1.9-3.3a.5.5 0 0 0-.1-.6l-2-1.6zM12 15.5A3.5 3.5 0 1 1 12 8.5a3.5 3.5 0 0 1 0 7z"/></svg>
+  </button>
+</header>
+
+<main>
+  <h1>Download videos <span>in any quality</span></h1>
+  <p class="lead">Paste a YouTube link, pick a resolution, and download. Works with normal links, short links and Shorts.</p>
+
+  <form class="box" id="form" autocomplete="off">
+    <div class="search">
+      <div class="field">
+        <input id="url" type="text" inputmode="url" placeholder="Paste a YouTube link here…" aria-label="YouTube link" required>
+        <button type="button" class="paste" id="pasteBtn">Paste</button>
+      </div>
+      <button class="go" id="goBtn" type="submit">Get video</button>
+    </div>
+    <div class="hint">Example: https://www.youtube.com/watch?v=… or https://youtu.be/…</div>
+    <div class="msg" id="msg" role="alert"></div>
+  </form>
+
+  <section id="result" class="box" aria-live="polite">
+    <div class="video">
+      <div class="thumb"><img id="thumb" alt="Video thumbnail"><span class="dur" id="dur"></span></div>
+      <div class="meta">
+        <h2 id="title"></h2>
+        <p id="author"></p>
+        <p id="views"></p>
+      </div>
+    </div>
+    <div class="section-title">Video (with sound)</div>
+    <div class="list" id="videoList"></div>
+    <div class="section-title" id="audioTitle">Audio only</div>
+    <div class="list" id="audioList"></div>
+  </section>
+
+  <div class="steps">
+    <div class="step"><b>1</b><h3>Paste the link</h3><p>Copy the video address from YouTube and paste it above.</p></div>
+    <div class="step"><b>2</b><h3>Choose a quality</h3><p>You will see every resolution available for that video, up to 4K.</p></div>
+    <div class="step"><b>3</b><h3>Download</h3><p>Press Download, wait a moment while the file is prepared, and it saves to your device.</p></div>
+  </div>
+</main>
+
+<footer>Only download videos that you own or have permission to download. Respect copyright and the terms of the website the video comes from.</footer>
+
+<dialog id="dlg">
+  <h3>Server settings</h3>
+  <p>The web address of your downloader API. Leave the default if this page is served by the API itself.</p>
+  <input id="apiInput" type="url" placeholder="http://localhost:8000">
+  <div class="dlg-actions">
+    <button class="btn2" id="dlgCancel" type="button">Cancel</button>
+    <button class="btn2 primary" id="dlgSave" type="button">Save</button>
+  </div>
+</dialog>
+
+<script>
+(function(){
+  "use strict";
+  const $ = (s) => document.querySelector(s);
+
+  /* ---------- API address ---------- */
+  function defaultApi(){
+    return location.protocol === "file:" ? "http://localhost:8000" : location.origin;
+  }
+  function loadApi(){
+    try{
+      const q = new URLSearchParams(location.search).get("api");
+      if(q) return q.replace(/\/+$/, "");
+      const s = localStorage.getItem("vd_api");
+      if(s) return s;
+    }catch(e){}
+    return defaultApi();
+  }
+  let API = loadApi();
+  let apiChecked = false;
+
+  /* If this page is opened from some other server (e.g. VS Code Live Server), that server has no
+     downloader API. Check /health on this origin and fall back to http://localhost:8000. */
+  async function resolveApi(){
+    if(apiChecked) return;
+    apiChecked = true;
+    let custom = false;
+    try{ custom = !!(new URLSearchParams(location.search).get("api") || localStorage.getItem("vd_api")); }catch(e){}
+    if(custom || location.protocol === "file:") return;
+    try{
+      const r = await fetch(API + "/health");
+      const j = await r.json();
+      if(r.ok && j && j.status === "ok") return;
+    }catch(e){}
+    API = "http://localhost:8000";
+  }
+
+  /* ---------- helpers ---------- */
+  const ID_RE = /^(?:https?:\/\/)?(?:www\.|m\.)?(?:youtube\.com\/(?:watch\?(?:\S*&)?v=|shorts\/|embed\/)|youtu\.be\/)([A-Za-z0-9_-]{11})(?:[&?#\/]\S*)?$/;
+  const isValid = (u) => ID_RE.test(u.trim());
+  const esc = (s) => String(s == null ? "" : s).replace(/[&<>"']/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+  const fmtBytes = (n) => n > 1048576 ? (n/1048576).toFixed(1) + " MB" : Math.max(1, Math.round(n/1024)) + " KB";
+  const fmtViews = (n) => n == null ? "" : new Intl.NumberFormat("en", {notation:"compact"}).format(n) + " views";
+
+  function showError(text){ const m = $("#msg"); m.textContent = text; m.className = "msg err"; }
+  function clearError(){ const m = $("#msg"); m.textContent = ""; m.className = "msg"; }
+
+  async function readError(res){
+    try{ const j = await res.json(); if(j && j.error) return j.error; }catch(e){}
+    if(res.status === 404) return "The server at " + API + " does not have the downloader API (error 404). Start the API with \"python app.py\" and open http://localhost:8000 in your browser, or set the right address with the gear button.";
+    return "Server error (" + res.status + ").";
+  }
+  function networkMessage(){
+    return "Cannot reach the downloader server at " + API + ". Make sure it is running, or change the address with the gear button.";
+  }
+
+  /* ---------- paste button ---------- */
+  $("#pasteBtn").addEventListener("click", async () => {
+    try{
+      const t = await navigator.clipboard.readText();
+      if(t){ $("#url").value = t.trim(); $("#url").focus(); }
+    }catch(e){ $("#url").focus(); showError("Your browser blocked clipboard access. Press Ctrl+V (or Cmd+V) in the box instead."); }
+  });
+
+  /* ---------- get info ---------- */
+  let currentUrl = "";
+  $("#form").addEventListener("submit", async (ev) => {
+    ev.preventDefault();
+    clearError();
+    const url = $("#url").value.trim();
+    if(!isValid(url)){ showError("That does not look like a valid YouTube link. Please check it and try again."); return; }
+
+    const btn = $("#goBtn");
+    btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>Loading…';
+    $("#result").style.display = "none";
+    try{
+      await resolveApi();
+      const res = await fetch(API + "/api/info?url=" + encodeURIComponent(url));
+      if(!res.ok){ showError(await readError(res)); return; }
+      render(await res.json());
+      currentUrl = url;
+    }catch(e){
+      showError(networkMessage());
+    }finally{
+      btn.disabled = false; btn.textContent = "Get video";
+    }
+  });
+
+  /* ---------- render result ---------- */
+  function tagFor(h){
+    if(h >= 2160) return '<span class="tag k4">4K</span>';
+    if(h >= 1440) return '<span class="tag">2K</span>';
+    if(h >= 1080) return '<span class="tag">Full HD</span>';
+    if(h >= 720)  return '<span class="tag">HD</span>';
+    return '<span class="tag">SD</span>';
+  }
+  const DL_ICON = '<svg viewBox="0 0 24 24"><path d="M12 3a1 1 0 0 1 1 1v9.59l3.3-3.3a1 1 0 1 1 1.4 1.42l-5 5a1 1 0 0 1-1.4 0l-5-5a1 1 0 1 1 1.4-1.42L11 13.59V4a1 1 0 0 1 1-1zM5 19a1 1 0 1 1 0-2h14a1 1 0 1 1 0 2H5z"/></svg>';
+
+  function rowHtml(q, label, tag){
+    return '<div class="row" data-q="' + esc(q) + '">' +
+      '<div class="left"><span class="res">' + esc(label) + '</span>' + tag + '</div>' +
+      '<button class="dl" type="button">' + DL_ICON + 'Download</button>' +
+      '<div class="progress"><div class="bar"><i></i></div><div class="status"></div></div></div>';
+  }
+
+  function render(d){
+    $("#thumb").src = d.thumbnail || "";
+    $("#dur").textContent = d.duration || "";
+    $("#dur").style.display = d.duration ? "" : "none";
+    $("#title").textContent = d.title || "Untitled video";
+    $("#author").textContent = d.author || "";
+    $("#views").textContent = fmtViews(d.views);
+
+    const qs = (d.qualities || []);
+    const heights = qs.filter((q) => q !== "audio").map((q) => parseInt(q, 10)).filter(Boolean).sort((a,b) => b - a);
+    $("#videoList").innerHTML = heights.length
+      ? heights.map((h) => rowHtml(String(h), h + "p", tagFor(h))).join("")
+      : '<div class="status" style="padding:6px">No video qualities found for this link.</div>';
+    const hasAudio = qs.includes("audio");
+    $("#audioTitle").style.display = hasAudio ? "" : "none";
+    $("#audioList").innerHTML = hasAudio ? rowHtml("audio", "MP3", '<span class="tag audio">Audio only</span>') : "";
+
+    $("#result").style.display = "block";
+    $("#result").scrollIntoView({behavior:"smooth", block:"start"});
+  }
+
+  document.addEventListener("click", (ev) => {
+    const b = ev.target.closest(".dl");
+    if(!b) return;
+    const row = b.closest(".row");
+    if(row) startDownload(row, b);
+  });
+
+  /* ---------- download with progress ---------- */
+  function filenameFrom(res, fallback){
+    const cd = res.headers.get("Content-Disposition") || "";
+    let m = /filename\*\s*=\s*UTF-8''([^;]+)/i.exec(cd);
+    if(m){ try{ return decodeURIComponent(m[1]); }catch(e){} }
+    m = /filename\s*=\s*"?([^";]+)"?/i.exec(cd);
+    return m ? m[1] : fallback;
+  }
+
+  async function startDownload(row, btn){
+    const q = row.dataset.q;
+    const box = row.querySelector(".progress");
+    const bar = box.querySelector(".bar");
+    const fill = bar.querySelector("i");
+    const status = box.querySelector(".status");
+
+    btn.disabled = true; btn.classList.remove("done");
+    btn.innerHTML = '<span class="spinner"></span>Preparing…';
+    box.style.display = "block"; status.className = "status";
+    bar.classList.add("indet"); fill.style.width = "";
+    status.textContent = "Getting the file ready on the server. Large videos can take a minute or two…";
+
+    try{
+      const res = await fetch(API + "/api/download?url=" + encodeURIComponent(currentUrl) + "&quality=" + encodeURIComponent(q));
+      if(!res.ok) throw new Error(await readError(res));
+
+      const total = parseInt(res.headers.get("Content-Length") || "0", 10);
+      const name = filenameFrom(res, q === "audio" ? "audio.mp3" : "video-" + q + "p.mp4");
+      bar.classList.remove("indet"); fill.style.width = "0%";
+      btn.innerHTML = '<span class="spinner"></span>Downloading…';
+
+      let blob;
+      if(res.body && res.body.getReader){
+        const reader = res.body.getReader(); const chunks = []; let got = 0;
+        for(;;){
+          const {done, value} = await reader.read();
+          if(done) break;
+          chunks.push(value); got += value.length;
+          if(total){ fill.style.width = Math.min(100, got/total*100).toFixed(1) + "%"; status.textContent = fmtBytes(got) + " of " + fmtBytes(total); }
+          else { status.textContent = fmtBytes(got) + " downloaded"; }
+        }
+        blob = new Blob(chunks, {type: res.headers.get("Content-Type") || "application/octet-stream"});
+      }else{
+        blob = await res.blob();
+      }
+      fill.style.width = "100%";
+
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob); a.download = name;
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(a.href), 60000);
+
+      status.textContent = "Done. Saved as " + name + " (" + fmtBytes(blob.size) + ").";
+      btn.classList.add("done"); btn.innerHTML = DL_ICON + "Download again";
+    }catch(e){
+      bar.classList.remove("indet"); fill.style.width = "0%";
+      status.className = "status err";
+      status.textContent = (e instanceof TypeError) ? networkMessage() : (e.message || "Download failed.");
+      btn.innerHTML = DL_ICON + "Try again";
+    }finally{
+      btn.disabled = false;
+    }
+  }
+
+  /* ---------- settings dialog ---------- */
+  const dlg = $("#dlg");
+  $("#settingsBtn").addEventListener("click", () => { $("#apiInput").value = API; dlg.showModal(); });
+  $("#dlgCancel").addEventListener("click", () => dlg.close());
+  $("#dlgSave").addEventListener("click", () => {
+    const v = $("#apiInput").value.trim().replace(/\/+$/, "");
+    API = v || defaultApi();
+    apiChecked = !!v;
+    try{ v ? localStorage.setItem("vd_api", v) : localStorage.removeItem("vd_api"); }catch(e){}
+    dlg.close();
+  });
+})();
+</script>
+</body>
+</html>

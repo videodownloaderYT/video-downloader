@@ -1,0 +1,13 @@
+# One-click deploy on Render: push this folder to GitHub, then
+# Render dashboard -> New -> Blueprint -> select the repo.
+services:
+  - type: web
+    name: video-downloader
+    runtime: docker
+    plan: free
+    healthCheckPath: /health
+    envVars:
+      - key: MAX_DURATION_SECONDS
+        value: "3600"
+      - key: RATE_LIMIT_PER_MIN
+        value: "10"
